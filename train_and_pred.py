@@ -77,7 +77,7 @@ def lstm_train(ts_cd, index):
         loss.backward()
         opt.step()
     state = {'model': model.state_dict(), 'optimizer': opt.state_dict(), 'epoch': num_epochs}
-    torch.save(state, './model_para_stock/{}_{}_LSTM.pth'.format(name_dict[ts_cd], feature_dict[index]))
+    torch.save(state, './model_para_stock/{}_{}_LSTM.pth'.format(ts_cd, feature_dict[index]))
 
 
 def gru_train(ts_cd, index):
@@ -120,7 +120,7 @@ def gru_train(ts_cd, index):
         loss.backward()
         opt.step()
     state = {'model': model.state_dict(), 'optimizer': opt.state_dict(), 'epoch': num_epochs}
-    torch.save(state, './model_para_stock/{}_{}_GRU.pth'.format(name_dict[ts_cd], feature_dict[index]))
+    torch.save(state, './model_para_stock/{}_{}_GRU.pth'.format(ts_cd, feature_dict[index]))
 
 
 def dnn_train(ts_cd, index):
@@ -163,7 +163,7 @@ def dnn_train(ts_cd, index):
         loss.backward()
         opt.step()
     state = {'model': model.state_dict(), 'optimizer': opt.state_dict(), 'epoch': num_epochs}
-    torch.save(state, '/kaggle/working/{}_{}_DNN.pth'.format(name_dict[ts_cd], feature_dict[index]))
+    torch.save(state, '/kaggle/working/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index]))
 
 
 def lstm_pred(ts_cd, index_config):
@@ -206,7 +206,7 @@ def lstm_pred(ts_cd, index_config):
     model = StockLSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, output_size=output_size)
     model=model.to(device)
     # 加载模型参数
-    checkpoint = torch.load('./model_para_stock/{}_{}_LSTM.pth'.format(name_dict[ts_cd], feature_dict[index_config]))
+    checkpoint = torch.load('./model_para_stock/{}_{}_LSTM.pth'.format(ts_cd, feature_dict[index_config]))
     model.load_state_dict(checkpoint['model'])
     # 预测
     y_pred = model(x)
@@ -254,7 +254,7 @@ def gru_pred(ts_cd, index_config):
     model = StockGRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, output_size=output_size)
     model=model.to(device)
     # 加载模型参数
-    checkpoint = torch.load('./model_para_stock/{}_{}_GRU.pth'.format(name_dict[ts_cd], feature_dict[index_config]))
+    checkpoint = torch.load('./model_para_stock/{}_{}_GRU.pth'.format(ts_cd, feature_dict[index_config]))
     model.load_state_dict(checkpoint['model'])
     # 预测
     y_pred = model(x)
@@ -303,7 +303,7 @@ def dnn_pred(ts_cd, index_config):
     model = StockDNN()
     model=model.to(device)
     # 加载模型参数
-    checkpoint = torch.load('/kaggle/working/{}_{}_DNN.pth'.format(name_dict[ts_cd], feature_dict[index_config]))
+    checkpoint = torch.load('/kaggle/working/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index_config]))
     model.load_state_dict(checkpoint['model'])
     # 预测
     y_pred = model(x)
@@ -383,50 +383,63 @@ class StockDNN(nn.Module):
         return self.linear4(x)
 
 
-def train_and_pred(ts_cd=''):
-    if ts_cd == '':
-        # LSTM
-        # 5支股票的4个标签训练&测试
-        lstm_result = []
-        for stock in range(5):
-            lstm_result.append([])
-            for i in range(4):
-                lstm_train(num_dict[stock], i)
-                lstm_result[stock].append(lstm_pred(num_dict[stock], i))
-        # GRU
-        gru_result = []
-        for stock in range(5):
-            gru_result.append([])
-            for i in range(4):
-                gru_train(num_dict[stock], i)
-                gru_result[stock].append(gru_pred(num_dict[stock], i))
-        # DNN
-        dnn_result = []
-        for stock in range(5):
-            dnn_result.append([])
-            for i in range(4):
-                dnn_train(num_dict[stock], i)
-                dnn_result[stock].append(dnn_pred(num_dict[stock], i))
-    else:
-        # LSTM
-        lstm_result = []
+def train_and_pred():
+    # LSTM
+    # 5支股票的4个标签训练&测试
+    lstm_result = []
+    for stock in range(5):
+        lstm_result.append([])
         for i in range(4):
-            lstm_train(ts_cd, i)
-            lstm_result.append(lstm_pred(ts_cd, i))
-        # GRU
-        gru_result = []
+            lstm_train(num_dict[stock], i)
+            lstm_result[stock].append(lstm_pred(num_dict[stock], i))
+    # GRU
+    gru_result = []
+    for stock in range(5):
+        gru_result.append([])
         for i in range(4):
-            gru_train(ts_cd, i)
-            gru_result.append(gru_pred(ts_cd, i))
-        # DNN
-        dnn_result = []
+            gru_train(num_dict[stock], i)
+            gru_result[stock].append(gru_pred(num_dict[stock], i))
+    # DNN
+    dnn_result = []
+    for stock in range(5):
+        dnn_result.append([])
         for i in range(4):
-            dnn_train(ts_cd, i)
-            dnn_result.append(dnn_pred(ts_cd, i))
+            dnn_train(num_dict[stock], i)
+            dnn_result[stock].append(dnn_pred(num_dict[stock], i))
     return [np.array(lstm_result).squeeze(), np.array(gru_result).squeeze(), np.array(dnn_result).squeeze()]
+
+
+def select_train(ts_cd):
+    for i in range(4):
+        lstm_train(ts_cd, i)
+        gru_train(ts_cd, i)
+        dnn_train(ts_cd, i)
+
+
+def select_pred(ts_cd):
+    lstm_res = []
+    gru_res = []
+    dnn_res = []
+    for i in range(4):
+        lstm_res.append(lstm_pred(ts_cd, i))
+        gru_res.append(gru_pred(ts_cd, i))
+        dnn_res.append(dnn_pred(ts_cd, i))
+    return [np.array(lstm_res).squeeze(), np.array(gru_res).squeeze(), np.array(dnn_res).squeeze()]
+
+
+def select_train_and_pred(ts_cd):
+    select_train(ts_cd)
+    return select_pred(ts_cd)
+
 
 if __name__ == '__main__':
     lstm, gru, dnn = train_and_pred()
     print(lstm)
     print(gru)
     print(dnn)
+    lstm, gru, dnn = select_train_and_pred()
+    print(lstm)
+    print(gru)
+    print(dnn)
+
+
