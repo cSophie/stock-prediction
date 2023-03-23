@@ -20,10 +20,10 @@ num_dict = {0: '600519.SH',
             2: '000538.SZ',
             3: '600030.SH',
             4: '000430.SZ'}
-feature_dict = {0: 'close',
-                1: 'open',
-                2: 'high',
-                3: 'low'}
+feature_dict = {0: 'open',
+                1: 'high',
+                2: 'low',
+                3: 'close'}
 name_dict = {
     '600519.SH': 'maotai',
     '000001.SZ': 'pingan',
