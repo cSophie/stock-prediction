@@ -129,13 +129,13 @@ def gru_train(ts_cd, index):
 
 def lstm_pred(ts_cd, index_config):
     """
-    指定待预测的股票代码和数据索引，使用LSTM预测明天的相应值。
+    指定待预测的股票代码和数据索引，使用LSTM预测下周的相应值。
     :param ts_cd: 股票代码，包括：
     600519.SH 贵州茅台
     000001.SZ 平安银行
     000538.SZ 云南白药
-    000430.SZ 张家界
     600030.SH 中信证券
+    000430.SZ 张家界
     :param index_config: 想预测的数据的索引，对应关系如下：
     0：open
     1：high
@@ -177,13 +177,13 @@ def lstm_pred(ts_cd, index_config):
 
 def gru_pred(ts_cd, index_config):
     """
-    指定待预测的股票代码和数据索引，使用GRU预测明天的相应值。
+    指定待预测的股票代码和数据索引，使用GRU预测下周的相应值。
     :param ts_cd: 股票代码，包括：
     600519.SH 贵州茅台
     000001.SZ 平安银行
     000538.SZ 云南白药
-    000430.SZ 张家界
     600030.SH 中信证券
+    000430.SZ 张家界
     :param index_config: 想预测的数据的索引，对应关系如下：
     0：open
     1：high
@@ -302,3 +302,15 @@ if __name__ == '__main__':
     lstm, gru = train_and_pred()
     print(lstm)
     print(gru)
+
+# lstm.shape == (5, 4, 7)       [股票种类, 标签, 天数]
+"""
+lstm[ , , 0]:
+                        open   high   low   close
+贵州茅台 600519.SH
+平安银行 000001.SZ
+云南白药 000538.SZ
+中信证券 600030.SH
+张家界 000430.SZ                        
+"""
+
