@@ -383,31 +383,47 @@ class StockDNN(nn.Module):
         return self.linear4(x)
 
 
-def train_and_pred():
-    # LSTM
-    # 5支股票的4个标签训练&测试
-    lstm_result = []
-    for stock in range(5):
-        lstm_result.append([])
+def train_and_pred(ts_cd=''):
+    if ts_cd == '':
+        # LSTM
+        # 5支股票的4个标签训练&测试
+        lstm_result = []
+        for stock in range(5):
+            lstm_result.append([])
+            for i in range(4):
+                lstm_train(num_dict[stock], i)
+                lstm_result[stock].append(lstm_pred(num_dict[stock], i))
+        # GRU
+        gru_result = []
+        for stock in range(5):
+            gru_result.append([])
+            for i in range(4):
+                gru_train(num_dict[stock], i)
+                gru_result[stock].append(gru_pred(num_dict[stock], i))
+        # DNN
+        dnn_result = []
+        for stock in range(5):
+            dnn_result.append([])
+            for i in range(4):
+                dnn_train(num_dict[stock], i)
+                dnn_result[stock].append(dnn_pred(num_dict[stock], i))
+    else:
+        # LSTM
+        lstm_result = []
         for i in range(4):
-            lstm_train(num_dict[stock], i)
-            lstm_result[stock].append(lstm_pred(num_dict[stock], i))
-    # GRU
-    gru_result = []
-    for stock in range(5):
-        gru_result.append([])
+            lstm_train(ts_cd, i)
+            lstm_result.append(lstm_pred(ts_cd, i))
+        # GRU
+        gru_result = []
         for i in range(4):
-            gru_train(num_dict[stock], i)
-            gru_result[stock].append(gru_pred(num_dict[stock], i))
-    # DNN
-    dnn_result = []
-    for stock in range(5):
-        dnn_result.append([])
+            gru_train(ts_cd, i)
+            gru_result.append(gru_pred(ts_cd, i))
+        # DNN
+        dnn_result = []
         for i in range(4):
-            dnn_train(num_dict[stock], i)
-            dnn_result[stock].append(dnn_pred(num_dict[stock], i))
+            dnn_train(ts_cd, i)
+            dnn_result.append(dnn_pred(ts_cd, i))
     return [np.array(lstm_result).squeeze(), np.array(gru_result).squeeze(), np.array(dnn_result).squeeze()]
-
 
 if __name__ == '__main__':
     lstm, gru, dnn = train_and_pred()
