@@ -3,11 +3,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from math import sqrt
-from pylab import mpl, plt
 from sklearn.preprocessing import MinMaxScaler
-import math, time
-from sklearn.metrics import mean_squared_error
 
 
 # 贵州茅台 600519.SH
@@ -127,15 +123,58 @@ def gru_train(ts_cd, index):
     torch.save(state, './model_para_stock/{}_{}_GRU.pth'.format(name_dict[ts_cd], feature_dict[index]))
 
 
+def dnn_train(ts_cd, index):
+    print('dnn_train')
+    df = pro.daily(ts_code=ts_cd, start_date='20190101', end_date=end_dt)
+    df = df.sort_index(ascending=True)
+    df = df.set_index('trade_date')
+    df.index = pd.to_datetime(df.index)
+    df = df.drop(columns=['ts_code'])
+    df = df.fillna(method='ffill')
+    scaler1 = MinMaxScaler(feature_range=(-1, 1))
+    scaler2 = MinMaxScaler(feature_range=(-1, 1))
+    df.iloc[:, index] = scaler1.fit_transform(df.iloc[:, index].values.reshape(-1, 1))
+    for i in range(9):
+        df.iloc[:,i] = scaler2.fit_transform(df.iloc[:,i].values.reshape(-1, 1))
+    x_train, y_train, x_test, y_test = load_data(df, timesteps, index)
+    x_train = torch.from_numpy(x_train).type(torch.Tensor)
+    x_test = torch.from_numpy(x_test).type(torch.Tensor)
+    y_train = torch.from_numpy(y_train).type(torch.Tensor)
+    y_test = torch.from_numpy(y_test).type(torch.Tensor)
+    model = StockDNN()
+    loss_fn = nn.MSELoss()
+    opt = torch.optim.Adam(model.parameters(), lr = 0.01)
+    model=model.to(device)
+    x_train = x_train.to(device)
+    y_train = y_train.to(device)
+    x_test = x_test.to(device)
+    y_test = y_test.to(device)
+    #
+    y_train = y_train.squeeze()
+    y_test = y_test.squeeze()
+    #
+    num_epochs = 100
+    for epoch in range(num_epochs):
+        y_train_pred = model(x_train)
+        loss = loss_fn(y_train_pred, y_train)
+        if epoch % 10 == 0 and epoch != 0:
+            print('Epoch ', epoch, 'MSE: ', loss.item())
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    state = {'model': model.state_dict(), 'optimizer': opt.state_dict(), 'epoch': num_epochs}
+    torch.save(state, '/kaggle/working/{}_{}_DNN.pth'.format(name_dict[ts_cd], feature_dict[index]))
+
+
 def lstm_pred(ts_cd, index_config):
     """
-    指定待预测的股票代码和数据索引，使用LSTM预测下周的相应值。
+    指定待预测的股票代码和数据索引，使用LSTM预测明天的相应值。
     :param ts_cd: 股票代码，包括：
     600519.SH 贵州茅台
     000001.SZ 平安银行
     000538.SZ 云南白药
-    600030.SH 中信证券
     000430.SZ 张家界
+    600030.SH 中信证券
     :param index_config: 想预测的数据的索引，对应关系如下：
     0：open
     1：high
@@ -177,13 +216,13 @@ def lstm_pred(ts_cd, index_config):
 
 def gru_pred(ts_cd, index_config):
     """
-    指定待预测的股票代码和数据索引，使用GRU预测下周的相应值。
+    指定待预测的股票代码和数据索引，使用GRU预测明天的相应值。
     :param ts_cd: 股票代码，包括：
     600519.SH 贵州茅台
     000001.SZ 平安银行
     000538.SZ 云南白药
-    600030.SH 中信证券
     000430.SZ 张家界
+    600030.SH 中信证券
     :param index_config: 想预测的数据的索引，对应关系如下：
     0：open
     1：high
@@ -216,6 +255,55 @@ def gru_pred(ts_cd, index_config):
     model=model.to(device)
     # 加载模型参数
     checkpoint = torch.load('./model_para_stock/{}_{}_GRU.pth'.format(name_dict[ts_cd], feature_dict[index_config]))
+    model.load_state_dict(checkpoint['model'])
+    # 预测
+    y_pred = model(x)
+    y_pred = scaler1.inverse_transform(y_pred.detach().cpu().numpy())
+    return y_pred
+
+
+def dnn_pred(ts_cd, index_config):
+    print('dnn_pred')
+    """
+    指定待预测的股票代码和数据索引，使用GRU预测明天的相应值。
+    :param ts_cd: 股票代码，包括：
+    600519.SH 贵州茅台
+    000001.SZ 平安银行
+    000538.SZ 云南白药
+    000430.SZ 张家界
+    600030.SH 中信证券
+    :param index_config: 想预测的数据的索引，对应关系如下：
+    0：open
+    1：high
+    2：low
+    3：close
+    :return: 预测值
+    """
+    print('gru_pred')
+    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date='')
+    # 数据处理开始
+    df = df.sort_index(ascending=True)
+    df = df.set_index('trade_date')
+    df.index = pd.to_datetime(df.index)
+    df = df.drop(columns=['ts_code'])
+    df = df.fillna(method='ffill')
+    scaler1 = MinMaxScaler(feature_range=(-1, 1))
+    scaler2 = MinMaxScaler(feature_range=(-1, 1))
+    df.iloc[:, index_config] = scaler1.fit_transform(df.iloc[:, index_config].values.reshape(-1, 1))
+    for i in range(9):
+        df.iloc[:, i] = scaler2.fit_transform(df.iloc[:, i].values.reshape(-1, 1))
+    # 取最近timesteps天的数据，预测明天的open
+    df = df.iloc[0: timesteps - 7, ]
+    x = test_data(df, timesteps - 7)
+    x = torch.from_numpy(x).type(torch.Tensor)
+    x = x.to(device)
+    # 数据处理结束
+
+    # 模型结构
+    model = StockDNN()
+    model=model.to(device)
+    # 加载模型参数
+    checkpoint = torch.load('/kaggle/working/{}_{}_DNN.pth'.format(name_dict[ts_cd], feature_dict[index_config]))
     model.load_state_dict(checkpoint['model'])
     # 预测
     y_pred = model(x)
@@ -279,6 +367,22 @@ class StockGRU(nn.Module):
         return out
 
 
+class StockDNN(nn.Module):
+    def __init__(self):
+        super(StockDNN, self).__init__()
+        self.linear1 = nn.Linear(53 * 9, 340)
+        self.linear2 = nn.Linear(340, 240)
+        self.linear3 = nn.Linear(240, 120)
+        self.linear4 = nn.Linear(120, 7)
+        self.relu = nn.ReLU()
+    def forward(self, x):
+        x = x.view(-1, 53 * 9)
+        x = self.relu(self.linear1(x))
+        x = self.relu(self.linear2(x))
+        x = self.relu(self.linear3(x))
+        return self.linear4(x)
+
+
 def train_and_pred():
     # LSTM
     # 5支股票的4个标签训练&测试
@@ -295,22 +399,18 @@ def train_and_pred():
         for i in range(4):
             gru_train(num_dict[stock], i)
             gru_result[stock].append(gru_pred(num_dict[stock], i))
-    return [np.array(lstm_result).squeeze(), np.array(gru_result).squeeze()]
+    # DNN
+    dnn_result = []
+    for stock in range(5):
+        dnn_result.append([])
+        for i in range(4):
+            dnn_train(num_dict[stock], i)
+            dnn_result[stock].append(dnn_pred(num_dict[stock], i))
+    return [np.array(lstm_result).squeeze(), np.array(gru_result).squeeze(), np.array(dnn_result).squeeze()]
 
 
 if __name__ == '__main__':
-    lstm, gru = train_and_pred()
+    lstm, gru, dnn = train_and_pred()
     print(lstm)
     print(gru)
-
-# lstm.shape == (5, 4, 7)       [股票种类, 标签, 天数]
-"""
-lstm[ , , 0]:
-                        open   high   low   close
-贵州茅台 600519.SH
-平安银行 000001.SZ
-云南白药 000538.SZ
-中信证券 600030.SH
-张家界 000430.SZ                        
-"""
-
+    print(dnn)
