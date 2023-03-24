@@ -3,7 +3,11 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+from math import sqrt
+from pylab import mpl, plt
 from sklearn.preprocessing import MinMaxScaler
+import math, time
+from sklearn.metrics import mean_squared_error
 
 
 # 贵州茅台 600519.SH
@@ -11,15 +15,16 @@ from sklearn.preprocessing import MinMaxScaler
 # 云南白药 000538.SZ
 # 中信证券 600030.SH
 # 张家界 000430.SZ
-num_dict = {0: '600519.SH',
-            1: '000001.SZ',
-            2: '000538.SZ',
-            3: '600030.SH',
-            4: '000430.SZ'}
+
+# 预训练股票代码
+pre_train_stock = ['600519.SH', '000001.SZ', '000538.SZ', '600030.SH', '000430.SZ']
+
+# 在文件读写中标记open/high/low/close
 feature_dict = {0: 'open',
                 1: 'high',
                 2: 'low',
                 3: 'close'}
+# 原在文件读写中标记股票名称，现直接用股票代码代替，故已废弃
 name_dict = {
     '600519.SH': 'maotai',
     '000001.SZ': 'pingan',
@@ -27,8 +32,9 @@ name_dict = {
     '600030.SH': 'zhongxin',
     '000430.SZ': 'zhangjiajie'
 }
+
 pro = ts.pro_api('e9b31113ccd628c7933a0af4e9c45f38aee75b5d9a4fb89fde3c460a')
-end_dt = '20230320'
+end_dt = ''
 timesteps = 60
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 input_size = 9
@@ -71,8 +77,8 @@ def lstm_train(ts_cd, index):
     for epoch in range(num_epochs):
         y_train_pred = model(x_train)
         loss = loss_fn(y_train_pred, y_train)
-        if epoch % 10 == 0 and epoch != 0:
-            print('Epoch ', epoch, 'MSE: ', loss.item())
+#         if epoch % 10 == 0 and epoch != 0:
+#             print('Epoch ', epoch, 'MSE: ', loss.item())
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -114,8 +120,8 @@ def gru_train(ts_cd, index):
     for epoch in range(num_epochs):
         y_train_pred = model(x_train)
         loss = loss_fn(y_train_pred, y_train)
-        if epoch % 10 == 0 and epoch != 0:
-            print('Epoch ', epoch, 'MSE: ', loss.item())
+#         if epoch % 10 == 0 and epoch != 0:
+#             print('Epoch ', epoch, 'MSE: ', loss.item())
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -157,18 +163,18 @@ def dnn_train(ts_cd, index):
     for epoch in range(num_epochs):
         y_train_pred = model(x_train)
         loss = loss_fn(y_train_pred, y_train)
-        if epoch % 10 == 0 and epoch != 0:
-            print('Epoch ', epoch, 'MSE: ', loss.item())
+#         if epoch % 10 == 0 and epoch != 0:
+#             print('Epoch ', epoch, 'MSE: ', loss.item())
         opt.zero_grad()
         loss.backward()
         opt.step()
     state = {'model': model.state_dict(), 'optimizer': opt.state_dict(), 'epoch': num_epochs}
-    torch.save(state, '/kaggle/working/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index]))
+    torch.save(state, './model_para_stock/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index]))
 
 
 def lstm_pred(ts_cd, index_config):
     """
-    指定待预测的股票代码和数据索引，使用LSTM预测明天的相应值。
+    指定待预测的股票代码和数据索引，使用LSTM预测下周的相应值。
     :param ts_cd: 股票代码，包括：
     600519.SH 贵州茅台
     000001.SZ 平安银行
@@ -216,7 +222,7 @@ def lstm_pred(ts_cd, index_config):
 
 def gru_pred(ts_cd, index_config):
     """
-    指定待预测的股票代码和数据索引，使用GRU预测明天的相应值。
+    指定待预测的股票代码和数据索引，使用GRU预测下周的相应值。
     :param ts_cd: 股票代码，包括：
     600519.SH 贵州茅台
     000001.SZ 平安银行
@@ -263,9 +269,8 @@ def gru_pred(ts_cd, index_config):
 
 
 def dnn_pred(ts_cd, index_config):
-    print('dnn_pred')
     """
-    指定待预测的股票代码和数据索引，使用GRU预测明天的相应值。
+    指定待预测的股票代码和数据索引，使用DNN预测下周的相应值。
     :param ts_cd: 股票代码，包括：
     600519.SH 贵州茅台
     000001.SZ 平安银行
@@ -279,7 +284,7 @@ def dnn_pred(ts_cd, index_config):
     3：close
     :return: 预测值
     """
-    print('gru_pred')
+    print('dnn_pred')
     df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date='')
     # 数据处理开始
     df = df.sort_index(ascending=True)
@@ -303,7 +308,7 @@ def dnn_pred(ts_cd, index_config):
     model = StockDNN()
     model=model.to(device)
     # 加载模型参数
-    checkpoint = torch.load('/kaggle/working/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index_config]))
+    checkpoint = torch.load('./model_para_stock/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index_config]))
     model.load_state_dict(checkpoint['model'])
     # 预测
     y_pred = model(x)
@@ -383,40 +388,14 @@ class StockDNN(nn.Module):
         return self.linear4(x)
 
 
-def train_and_pred():
-    # LSTM
-    # 5支股票的4个标签训练&测试
-    lstm_result = []
-    for stock in range(5):
-        lstm_result.append([])
-        for i in range(4):
-            lstm_train(num_dict[stock], i)
-            lstm_result[stock].append(lstm_pred(num_dict[stock], i))
-    # GRU
-    gru_result = []
-    for stock in range(5):
-        gru_result.append([])
-        for i in range(4):
-            gru_train(num_dict[stock], i)
-            gru_result[stock].append(gru_pred(num_dict[stock], i))
-    # DNN
-    dnn_result = []
-    for stock in range(5):
-        dnn_result.append([])
-        for i in range(4):
-            dnn_train(num_dict[stock], i)
-            dnn_result[stock].append(dnn_pred(num_dict[stock], i))
-    return [np.array(lstm_result).squeeze(), np.array(gru_result).squeeze(), np.array(dnn_result).squeeze()]
-
-
-def select_train(ts_cd):
+def train(ts_cd):
     for i in range(4):
         lstm_train(ts_cd, i)
         gru_train(ts_cd, i)
         dnn_train(ts_cd, i)
 
 
-def select_pred(ts_cd):
+def pred(ts_cd):
     lstm_res = []
     gru_res = []
     dnn_res = []
@@ -427,17 +406,37 @@ def select_pred(ts_cd):
     return [np.array(lstm_res).squeeze(), np.array(gru_res).squeeze(), np.array(dnn_res).squeeze()]
 
 
+def pre_train_and_pred():
+    """
+    预训练5支股票，如需要增减、改变预训练的股票，在pre_train_stock中更改
+    """
+    lstm = []
+    gru = []
+    dnn = []
+    for stock in pre_train_stock:
+        print(stock)
+        train(stock)
+        temp1, temp2, temp3 = pred(stock)
+        lstm.append(temp1)
+        gru.append(temp2)
+        dnn.append(temp3)
+    return [np.array(lstm), np.array(gru), np.array(dnn)]
+
+
 def select_train_and_pred(ts_cd):
-    select_train(ts_cd)
-    return select_pred(ts_cd)
+    train(ts_cd)
+    return pred(ts_cd)
 
 
 if __name__ == '__main__':
-    lstm, gru, dnn = train_and_pred()
+    lstm, gru, dnn = pre_train_and_pred()
+    print(lstm.shape)           # (5, 4, 7)   [股票种类, 标签, 天数]
     print(lstm)
     print(gru)
     print(dnn)
-    lstm, gru, dnn = select_train_and_pred()
+    # 自选
+    lstm, gru, dnn = select_train_and_pred('300999.SZ')
+    print(lstm.shape)           # (4, 7)      [标签, 天数]
     print(lstm)
     print(gru)
     print(dnn)
