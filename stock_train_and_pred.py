@@ -189,7 +189,7 @@ def lstm_pred(ts_cd, index_config):
     :return: 预测值
     """
     print('lstm_pred')
-    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date='')
+    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date=end_dt)
     # 数据处理开始
     df = df.sort_index(ascending=True)
     df = df.set_index('trade_date')
@@ -237,7 +237,7 @@ def gru_pred(ts_cd, index_config):
     :return: 预测值
     """
     print('gru_pred')
-    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date='')
+    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date=end_dt)
     # 数据处理开始
     df = df.sort_index(ascending=True)
     df = df.set_index('trade_date')
@@ -285,7 +285,7 @@ def dnn_pred(ts_cd, index_config):
     :return: 预测值
     """
     print('dnn_pred')
-    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date='')
+    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date=end_dt)
     # 数据处理开始
     df = df.sort_index(ascending=True)
     df = df.set_index('trade_date')
