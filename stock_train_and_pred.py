@@ -34,6 +34,7 @@ name_dict = {
 }
 
 pro = ts.pro_api('e9b31113ccd628c7933a0af4e9c45f38aee75b5d9a4fb89fde3c460a')
+start_dt = '20190101'
 end_dt = ''
 timesteps = 60
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -43,9 +44,9 @@ num_layers = 2
 output_size = 7
 
 
-def lstm_train(ts_cd, index):
+def lstm_train(ts_cd, index, dataframe):
     print('lstm_train')
-    df = pro.daily(ts_code=ts_cd, start_date='20190101', end_date=end_dt)
+    df = dataframe
     df = df.sort_index(ascending=True)
     df = df.set_index('trade_date')
     df.index = pd.to_datetime(df.index)
@@ -86,9 +87,9 @@ def lstm_train(ts_cd, index):
     torch.save(state, './model_para_stock/{}_{}_LSTM.pth'.format(ts_cd, feature_dict[index]))
 
 
-def gru_train(ts_cd, index):
+def gru_train(ts_cd, index, dataframe):
     print('gru_train')
-    df = pro.daily(ts_code=ts_cd, start_date='20190101', end_date=end_dt)
+    df = dataframe
     df = df.sort_index(ascending=True)
     df = df.set_index('trade_date')
     df.index = pd.to_datetime(df.index)
@@ -129,9 +130,9 @@ def gru_train(ts_cd, index):
     torch.save(state, './model_para_stock/{}_{}_GRU.pth'.format(ts_cd, feature_dict[index]))
 
 
-def dnn_train(ts_cd, index):
+def dnn_train(ts_cd, index, dataframe):
     print('dnn_train')
-    df = pro.daily(ts_code=ts_cd, start_date='20190101', end_date=end_dt)
+    df = dataframe
     df = df.sort_index(ascending=True)
     df = df.set_index('trade_date')
     df.index = pd.to_datetime(df.index)
@@ -172,7 +173,7 @@ def dnn_train(ts_cd, index):
     torch.save(state, './model_para_stock/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index]))
 
 
-def lstm_pred(ts_cd, index_config):
+def lstm_pred(ts_cd, index_config, dataframe):
     """
     指定待预测的股票代码和数据索引，使用LSTM预测下周的相应值。
     :param ts_cd: 股票代码，包括：
@@ -189,7 +190,7 @@ def lstm_pred(ts_cd, index_config):
     :return: 预测值
     """
     print('lstm_pred')
-    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date=end_dt)
+    df = dataframe
     # 数据处理开始
     df = df.sort_index(ascending=True)
     df = df.set_index('trade_date')
@@ -220,7 +221,7 @@ def lstm_pred(ts_cd, index_config):
     return y_pred
 
 
-def gru_pred(ts_cd, index_config):
+def gru_pred(ts_cd, index_config, dataframe):
     """
     指定待预测的股票代码和数据索引，使用GRU预测下周的相应值。
     :param ts_cd: 股票代码，包括：
@@ -237,7 +238,7 @@ def gru_pred(ts_cd, index_config):
     :return: 预测值
     """
     print('gru_pred')
-    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date=end_dt)
+    df = dataframe
     # 数据处理开始
     df = df.sort_index(ascending=True)
     df = df.set_index('trade_date')
@@ -268,7 +269,7 @@ def gru_pred(ts_cd, index_config):
     return y_pred
 
 
-def dnn_pred(ts_cd, index_config):
+def dnn_pred(ts_cd, index_config, dataframe):
     """
     指定待预测的股票代码和数据索引，使用DNN预测下周的相应值。
     :param ts_cd: 股票代码，包括：
@@ -285,7 +286,7 @@ def dnn_pred(ts_cd, index_config):
     :return: 预测值
     """
     print('dnn_pred')
-    df = pro.daily(ts_code=ts_cd, start_date='20220101', end_date=end_dt)
+    df = dataframe
     # 数据处理开始
     df = df.sort_index(ascending=True)
     df = df.set_index('trade_date')
@@ -348,6 +349,7 @@ class StockLSTM(nn.Module):
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.linear = nn.Linear(hidden_size, output_size)
 
+
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).requires_grad_().to(device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).requires_grad_().to(device)
@@ -380,6 +382,7 @@ class StockDNN(nn.Module):
         self.linear3 = nn.Linear(240, 120)
         self.linear4 = nn.Linear(120, 7)
         self.relu = nn.ReLU()
+
     def forward(self, x):
         x = x.view(-1, 53 * 9)
         x = self.relu(self.linear1(x))
@@ -389,20 +392,34 @@ class StockDNN(nn.Module):
 
 
 def train(ts_cd):
+    df = pro.daily(ts_code=ts_cd, start_date=start_dt, end_date=end_dt)
     for i in range(4):
-        lstm_train(ts_cd, i)
-        gru_train(ts_cd, i)
-        dnn_train(ts_cd, i)
+        lstm_train(ts_cd, i, df)
+        gru_train(ts_cd, i, df)
+        dnn_train(ts_cd, i, df)
 
 
 def pred(ts_cd):
     lstm_res = []
     gru_res = []
     dnn_res = []
+    df = pro.daily(ts_code=ts_cd, start_date=start_dt, end_date=end_dt)
     for i in range(4):
-        lstm_res.append(lstm_pred(ts_cd, i))
-        gru_res.append(gru_pred(ts_cd, i))
-        dnn_res.append(dnn_pred(ts_cd, i))
+        lstm_res.append(lstm_pred(ts_cd, i, df))
+        gru_res.append(gru_pred(ts_cd, i, df))
+        dnn_res.append(dnn_pred(ts_cd, i, df))
+    # dnn数据处理
+    for stock in range(5):
+        for day in range(7):
+            high = dnn_res[stock][1][day]
+            low = dnn_res[stock][2][day]
+            for i in range(4):
+                if high < dnn_res[stock][i][day]:
+                    high = dnn_res[stock][i][day]
+                if low > dnn_res[stock][i][day]:
+                    low = dnn_res[stock][i][day]
+            dnn_res[stock][1][day] = high
+            dnn_res[stock][2][day] = low
     return [np.array(lstm_res).squeeze(), np.array(gru_res).squeeze(), np.array(dnn_res).squeeze()]
 
 
@@ -428,17 +445,39 @@ def select_train_and_pred(ts_cd):
     return pred(ts_cd)
 
 
+def pct_chg(today, next_week):
+    res = []
+    temp = (next_week[0] - today) / today
+    res.append(temp)
+    for i in range(6):
+        temp = (next_week[i + 1] - next_week[i]) / next_week[i]
+        res.append(temp)
+    return np.array(res)
+
+
+def get_pct_chg(ts_cd, next_week):
+    df = pro.daily(ts_code=ts_cd, start_date=start_dt, end_date=end_dt)
+    return pct_chg(df.iloc[0, 5], next_week)
+
+
 if __name__ == '__main__':
     lstm, gru, dnn = pre_train_and_pred()
     print(lstm.shape)           # (5, 4, 7)   [股票种类, 标签, 天数]
     print(lstm)
     print(gru)
     print(dnn)
+    # 涨跌幅
+    for i in range(5):
+        stock = pre_train_stock[i]
+        temp = get_pct_chg(stock, lstm[i, 3])
+        print(temp)
     # 自选
     lstm, gru, dnn = select_train_and_pred('300999.SZ')
     print(lstm.shape)           # (4, 7)      [标签, 天数]
     print(lstm)
     print(gru)
     print(dnn)
+    # 涨跌幅
+    print(get_pct_chg('300999.SZ', lstm[3]))
 
 
