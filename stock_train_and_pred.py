@@ -3,11 +3,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from math import sqrt
-from pylab import mpl, plt
 from sklearn.preprocessing import MinMaxScaler
-import math, time
-from sklearn.metrics import mean_squared_error
 
 
 # 贵州茅台 600519.SH
@@ -24,14 +20,6 @@ feature_dict = {0: 'open',
                 1: 'high',
                 2: 'low',
                 3: 'close'}
-# 原在文件读写中标记股票名称，现直接用股票代码代替，故已废弃
-name_dict = {
-    '600519.SH': 'maotai',
-    '000001.SZ': 'pingan',
-    '000538.SZ': 'yunnan',
-    '600030.SH': 'zhongxin',
-    '000430.SZ': 'zhangjiajie'
-}
 
 pro = ts.pro_api('e9b31113ccd628c7933a0af4e9c45f38aee75b5d9a4fb89fde3c460a')
 start_dt = '20190101'
@@ -47,16 +35,6 @@ output_size = 7
 def lstm_train(ts_cd, index, dataframe):
     print('lstm_train')
     df = dataframe
-    df = df.sort_index(ascending=True)
-    df = df.set_index('trade_date')
-    df.index = pd.to_datetime(df.index)
-    df = df.drop(columns=['ts_code'])
-    df = df.fillna(method='ffill')
-    scaler1 = MinMaxScaler(feature_range=(-1, 1))
-    scaler2 = MinMaxScaler(feature_range=(-1, 1))
-    df.iloc[:, index] = scaler1.fit_transform(df.iloc[:, index].values.reshape(-1, 1))
-    for i in range(9):
-        df.iloc[:,i] = scaler2.fit_transform(df.iloc[:,i].values.reshape(-1, 1))
     x_train, y_train, x_test, y_test = load_data(df, timesteps, index)
     x_train = torch.from_numpy(x_train).type(torch.Tensor)
     x_test = torch.from_numpy(x_test).type(torch.Tensor)
@@ -78,8 +56,6 @@ def lstm_train(ts_cd, index, dataframe):
     for epoch in range(num_epochs):
         y_train_pred = model(x_train)
         loss = loss_fn(y_train_pred, y_train)
-#         if epoch % 10 == 0 and epoch != 0:
-#             print('Epoch ', epoch, 'MSE: ', loss.item())
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -90,16 +66,6 @@ def lstm_train(ts_cd, index, dataframe):
 def gru_train(ts_cd, index, dataframe):
     print('gru_train')
     df = dataframe
-    df = df.sort_index(ascending=True)
-    df = df.set_index('trade_date')
-    df.index = pd.to_datetime(df.index)
-    df = df.drop(columns=['ts_code'])
-    df = df.fillna(method='ffill')
-    scaler1 = MinMaxScaler(feature_range=(-1, 1))
-    scaler2 = MinMaxScaler(feature_range=(-1, 1))
-    df.iloc[:, index] = scaler1.fit_transform(df.iloc[:, index].values.reshape(-1, 1))
-    for i in range(9):
-        df.iloc[:,i] = scaler2.fit_transform(df.iloc[:,i].values.reshape(-1, 1))
     x_train, y_train, x_test, y_test = load_data(df, timesteps, index)
     x_train = torch.from_numpy(x_train).type(torch.Tensor)
     x_test = torch.from_numpy(x_test).type(torch.Tensor)
@@ -121,8 +87,6 @@ def gru_train(ts_cd, index, dataframe):
     for epoch in range(num_epochs):
         y_train_pred = model(x_train)
         loss = loss_fn(y_train_pred, y_train)
-#         if epoch % 10 == 0 and epoch != 0:
-#             print('Epoch ', epoch, 'MSE: ', loss.item())
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -133,16 +97,6 @@ def gru_train(ts_cd, index, dataframe):
 def dnn_train(ts_cd, index, dataframe):
     print('dnn_train')
     df = dataframe
-    df = df.sort_index(ascending=True)
-    df = df.set_index('trade_date')
-    df.index = pd.to_datetime(df.index)
-    df = df.drop(columns=['ts_code'])
-    df = df.fillna(method='ffill')
-    scaler1 = MinMaxScaler(feature_range=(-1, 1))
-    scaler2 = MinMaxScaler(feature_range=(-1, 1))
-    df.iloc[:, index] = scaler1.fit_transform(df.iloc[:, index].values.reshape(-1, 1))
-    for i in range(9):
-        df.iloc[:,i] = scaler2.fit_transform(df.iloc[:,i].values.reshape(-1, 1))
     x_train, y_train, x_test, y_test = load_data(df, timesteps, index)
     x_train = torch.from_numpy(x_train).type(torch.Tensor)
     x_test = torch.from_numpy(x_test).type(torch.Tensor)
@@ -173,7 +127,7 @@ def dnn_train(ts_cd, index, dataframe):
     torch.save(state, './model_para_stock/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index]))
 
 
-def lstm_pred(ts_cd, index_config, dataframe):
+def lstm_pred(ts_cd, index, dataframe):
     """
     指定待预测的股票代码和数据索引，使用LSTM预测下周的相应值。
     :param ts_cd: 股票代码，包括：
@@ -182,7 +136,7 @@ def lstm_pred(ts_cd, index_config, dataframe):
     000538.SZ 云南白药
     000430.SZ 张家界
     600030.SH 中信证券
-    :param index_config: 想预测的数据的索引，对应关系如下：
+    :param index: 想预测的数据的索引，对应关系如下：
     0：open
     1：high
     2：low
@@ -192,14 +146,9 @@ def lstm_pred(ts_cd, index_config, dataframe):
     print('lstm_pred')
     df = dataframe
     # 数据处理开始
-    df = df.sort_index(ascending=True)
-    df = df.set_index('trade_date')
-    df.index = pd.to_datetime(df.index)
-    df = df.drop(columns=['ts_code'])
-    df = df.fillna(method='ffill')
     scaler1 = MinMaxScaler(feature_range=(-1, 1))
     scaler2 = MinMaxScaler(feature_range=(-1, 1))
-    df.iloc[:, index_config] = scaler1.fit_transform(df.iloc[:, index_config].values.reshape(-1, 1))
+    df.iloc[:, index] = scaler1.fit_transform(df.iloc[:, index].values.reshape(-1, 1))
     for i in range(9):
         df.iloc[:, i] = scaler2.fit_transform(df.iloc[:, i].values.reshape(-1, 1))
     # 取最近timesteps天的数据，预测明天的open
@@ -213,7 +162,7 @@ def lstm_pred(ts_cd, index_config, dataframe):
     model = StockLSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, output_size=output_size)
     model=model.to(device)
     # 加载模型参数
-    checkpoint = torch.load('./model_para_stock/{}_{}_LSTM.pth'.format(ts_cd, feature_dict[index_config]))
+    checkpoint = torch.load('./model_para_stock/{}_{}_LSTM.pth'.format(ts_cd, feature_dict[index]))
     model.load_state_dict(checkpoint['model'])
     # 预测
     y_pred = model(x)
@@ -221,7 +170,7 @@ def lstm_pred(ts_cd, index_config, dataframe):
     return y_pred
 
 
-def gru_pred(ts_cd, index_config, dataframe):
+def gru_pred(ts_cd, index, dataframe):
     """
     指定待预测的股票代码和数据索引，使用GRU预测下周的相应值。
     :param ts_cd: 股票代码，包括：
@@ -230,7 +179,7 @@ def gru_pred(ts_cd, index_config, dataframe):
     000538.SZ 云南白药
     000430.SZ 张家界
     600030.SH 中信证券
-    :param index_config: 想预测的数据的索引，对应关系如下：
+    :param index: 想预测的数据的索引，对应关系如下：
     0：open
     1：high
     2：low
@@ -240,14 +189,9 @@ def gru_pred(ts_cd, index_config, dataframe):
     print('gru_pred')
     df = dataframe
     # 数据处理开始
-    df = df.sort_index(ascending=True)
-    df = df.set_index('trade_date')
-    df.index = pd.to_datetime(df.index)
-    df = df.drop(columns=['ts_code'])
-    df = df.fillna(method='ffill')
     scaler1 = MinMaxScaler(feature_range=(-1, 1))
     scaler2 = MinMaxScaler(feature_range=(-1, 1))
-    df.iloc[:, index_config] = scaler1.fit_transform(df.iloc[:, index_config].values.reshape(-1, 1))
+    df.iloc[:, index] = scaler1.fit_transform(df.iloc[:, index].values.reshape(-1, 1))
     for i in range(9):
         df.iloc[:, i] = scaler2.fit_transform(df.iloc[:, i].values.reshape(-1, 1))
     # 取最近timesteps天的数据，预测明天的open
@@ -261,7 +205,7 @@ def gru_pred(ts_cd, index_config, dataframe):
     model = StockGRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, output_size=output_size)
     model=model.to(device)
     # 加载模型参数
-    checkpoint = torch.load('./model_para_stock/{}_{}_GRU.pth'.format(ts_cd, feature_dict[index_config]))
+    checkpoint = torch.load('./model_para_stock/{}_{}_GRU.pth'.format(ts_cd, feature_dict[index]))
     model.load_state_dict(checkpoint['model'])
     # 预测
     y_pred = model(x)
@@ -269,7 +213,7 @@ def gru_pred(ts_cd, index_config, dataframe):
     return y_pred
 
 
-def dnn_pred(ts_cd, index_config, dataframe):
+def dnn_pred(ts_cd, index, dataframe):
     """
     指定待预测的股票代码和数据索引，使用DNN预测下周的相应值。
     :param ts_cd: 股票代码，包括：
@@ -278,7 +222,7 @@ def dnn_pred(ts_cd, index_config, dataframe):
     000538.SZ 云南白药
     000430.SZ 张家界
     600030.SH 中信证券
-    :param index_config: 想预测的数据的索引，对应关系如下：
+    :param index: 想预测的数据的索引，对应关系如下：
     0：open
     1：high
     2：low
@@ -288,14 +232,9 @@ def dnn_pred(ts_cd, index_config, dataframe):
     print('dnn_pred')
     df = dataframe
     # 数据处理开始
-    df = df.sort_index(ascending=True)
-    df = df.set_index('trade_date')
-    df.index = pd.to_datetime(df.index)
-    df = df.drop(columns=['ts_code'])
-    df = df.fillna(method='ffill')
     scaler1 = MinMaxScaler(feature_range=(-1, 1))
     scaler2 = MinMaxScaler(feature_range=(-1, 1))
-    df.iloc[:, index_config] = scaler1.fit_transform(df.iloc[:, index_config].values.reshape(-1, 1))
+    df.iloc[:, index] = scaler1.fit_transform(df.iloc[:, index].values.reshape(-1, 1))
     for i in range(9):
         df.iloc[:, i] = scaler2.fit_transform(df.iloc[:, i].values.reshape(-1, 1))
     # 取最近timesteps天的数据，预测明天的open
@@ -309,7 +248,7 @@ def dnn_pred(ts_cd, index_config, dataframe):
     model = StockDNN()
     model=model.to(device)
     # 加载模型参数
-    checkpoint = torch.load('./model_para_stock/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index_config]))
+    checkpoint = torch.load('./model_para_stock/{}_{}_DNN.pth'.format(ts_cd, feature_dict[index]))
     model.load_state_dict(checkpoint['model'])
     # 预测
     y_pred = model(x)
@@ -391,12 +330,37 @@ class StockDNN(nn.Module):
         return self.linear4(x)
 
 
+def data_process_train(index, dataframe):
+    df = dataframe
+    df = df.sort_index(ascending=True)
+    df = df.set_index('trade_date')
+    df.index = pd.to_datetime(df.index)
+    df = df.drop(columns=['ts_code'])
+    df = df.fillna(method='ffill')
+    scaler1 = MinMaxScaler(feature_range=(-1, 1))
+    scaler2 = MinMaxScaler(feature_range=(-1, 1))
+    df.iloc[:, index] = scaler1.fit_transform(df.iloc[:, index].values.reshape(-1, 1))
+    for i in range(9):
+        df.iloc[:, i] = scaler2.fit_transform(df.iloc[:, i].values.reshape(-1, 1))
+    return df
+
+
+def data_process_pred(index, dataframe):
+    df = dataframe
+    df = df.sort_index(ascending=True)
+    df = df.set_index('trade_date')
+    df.index = pd.to_datetime(df.index)
+    df = df.drop(columns=['ts_code'])
+    df = df.fillna(method='ffill')
+    return df
+
+
 def train(ts_cd):
     df = pro.daily(ts_code=ts_cd, start_date=start_dt, end_date=end_dt)
     for i in range(4):
-        lstm_train(ts_cd, i, df)
-        gru_train(ts_cd, i, df)
-        dnn_train(ts_cd, i, df)
+        lstm_train(ts_cd, i, data_process_train(i, df))
+        gru_train(ts_cd, i, data_process_train(i, df))
+        dnn_train(ts_cd, i, data_process_train(i, df))
 
 
 def pred(ts_cd):
@@ -405,9 +369,9 @@ def pred(ts_cd):
     dnn_res = []
     df = pro.daily(ts_code=ts_cd, start_date=start_dt, end_date=end_dt)
     for i in range(4):
-        lstm_res.append(lstm_pred(ts_cd, i, df))
-        gru_res.append(gru_pred(ts_cd, i, df))
-        dnn_res.append(dnn_pred(ts_cd, i, df))
+        lstm_res.append(lstm_pred(ts_cd, i, data_process_pred(i, df)))
+        gru_res.append(gru_pred(ts_cd, i, data_process_pred(i, df)))
+        dnn_res.append(dnn_pred(ts_cd, i, data_process_pred(i, df)))
     # dnn数据处理
     for stock in range(5):
         for day in range(7):
@@ -450,14 +414,14 @@ def pct_chg(today, next_week):
     temp = (next_week[0] - today) / today
     res.append(temp)
     for i in range(6):
-        temp = (next_week[i + 1] - next_week[i]) / next_week[i]
+        temp = (next_week[i + 1] - next_week[i]) / next_week[i] * 100
         res.append(temp)
     return np.array(res)
 
 
 def get_pct_chg(ts_cd, next_week):
     df = pro.daily(ts_code=ts_cd, start_date=start_dt, end_date=end_dt)
-    return pct_chg(df.iloc[0, 5], next_week)
+    return pct_chg(df.iloc[0, 5], next_week)        # sector: df.iloc[0, 2]
 
 
 if __name__ == '__main__':

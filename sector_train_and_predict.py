@@ -24,14 +24,10 @@ feature_dict = {0: 'close',
                 1: 'open',
                 2: 'high',
                 3: 'low'}
-# 原在文件读写中标记股票名称，现直接用股票代码代替，故已废弃
-name_dict = {"885431.TI": 'new_energy',
-             "885338.TI": 'trading',
-             "885728.TI": 'AI',
-             "885757.TI": 'blockchain',
-             "885362.TI": 'cloud'}
+
 
 pro = ts.pro_api('e9b31113ccd628c7933a0af4e9c45f38aee75b5d9a4fb89fde3c460a')
+start_dt = '20190101'
 end_dt = ''
 timesteps = 60
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -174,13 +170,13 @@ class StockGRU(nn.Module):
 
 
 def train(ts_cd):
-    df = pro.ths_daily(ts_code=ts_cd, start_date='20200101', end_date=end_dt)  ###
+    df = pro.ths_daily(ts_code=ts_cd, start_date=start_dt, end_date=end_dt)  ###
     for i in range(4):
         gru_train(ts_cd, i, df)
 
 
 def pred(ts_cd):
-    df = pro.ths_daily(ts_code=ts_cd, start_date='20200101', end_date=end_dt)  ###
+    df = pro.ths_daily(ts_code=ts_cd, start_date=start_dt, end_date=end_dt)  ###
     gru_res = []
     for i in range(4):
         gru_res.append(gru_pred(ts_cd, i, df))
@@ -203,6 +199,21 @@ def pre_train_and_pred():
 def select_train_and_pred(ts_cd):
     train(ts_cd)
     return pred(ts_cd)
+
+
+def pct_chg(today, next_week):
+    res = []
+    temp = (next_week[0] - today) / today
+    res.append(temp)
+    for i in range(6):
+        temp = (next_week[i + 1] - next_week[i]) / next_week[i] * 100
+        res.append(temp)
+    return np.array(res)
+
+
+def get_pct_chg(ts_cd, next_week):
+    df = pro.daily(ts_code=ts_cd, start_date=start_dt, end_date=end_dt)
+    return pct_chg(df.iloc[0, 2], next_week)        # sector: df.iloc[0, 2]
 
 
 if __name__ == '__main__':
