@@ -1,5 +1,5 @@
 # Stock-Prediction
-not predict it, just fit it.
+not predict, just fit.
 
 沪深股市数据分析系统
 
