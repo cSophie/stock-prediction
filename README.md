@@ -3,6 +3,8 @@ not predict it, just fit it.
 
 沪深股市数据分析系统
 
+使用LSTM, GRU, DNN预测接下来一周的股票数据。
+
 # 数据来源
 tushare
 
